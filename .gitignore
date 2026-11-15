@@ -1,1 +1,4 @@
 105-cad-1.nd2 - 105-cad-1.nd2 (series 1).ome.tif
+*_analysis/
+.DS_Store
+__pycache__/
