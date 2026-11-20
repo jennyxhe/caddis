@@ -1,6 +1,7 @@
 """Concatenate the ROI measurements from every timeseries analysed by pipeline.py.
 
-Finds every `<image name>_analysis/` folder in a directory (default: this one),
+Finds every `<image name>_analysis/` folder in a directory (chosen in a folder dialog
+unless given on the command line),
 and for each of
     measurements.csv, measurements_dFF.csv, measurements_dFF_norm.csv
 joins the ROI columns side by side, renumbering them 1, 2, 3, ... across series
@@ -8,7 +9,8 @@ joins the ROI columns side by side, renumbering them 1, 2, 3, ... across series
 
 Usage
 -----
-    uv run python concatenate.py [folder] [--outdir DIR]
+    uv run python concatenate.py               # opens a folder picker
+    uv run python concatenate.py folder [--outdir DIR]
 
 Outputs go into `concatenated_analysis/`:
     measurements.csv           Frame, Mean1, Mean2, ...       (all ROIs, all series)
@@ -191,10 +193,21 @@ def get_conditions(given: str | None, saved_file: Path) -> str:
     return text
 
 
+def choose_folder() -> Path | None:
+    """Open a dialog to pick the folder holding the *_analysis/ folders. None if cancelled."""
+    from napari.qt import get_qapp
+    from qtpy.QtWidgets import QFileDialog
+
+    get_qapp()
+    path = QFileDialog.getExistingDirectory(
+        None, "Choose the folder containing the *_analysis folders", str(Path.home()))
+    return Path(path) if path else None
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("folder", type=Path, nargs="?", default=Path("."),
-                   help="folder containing the *_analysis/ folders (default: current folder)")
+    p.add_argument("folder", type=Path, nargs="?", default=None,
+                   help="folder containing the *_analysis/ folders (omit to choose it in a dialog)")
     p.add_argument("--outdir", type=Path, default=None, help=f"output folder (default: <folder>/{OUT_NAME})")
     p.add_argument("--frame-interval", type=float, default=5,
                    help="seconds per frame, for the time axis (default 5)")
@@ -214,6 +227,11 @@ def main():
                         "if omitted you are prompted for them")
     p.add_argument("--no-open", action="store_true", help="don't open the plot PDF when done")
     args = p.parse_args()
+    if args.folder is None:
+        args.folder = choose_folder()
+        if args.folder is None:
+            print("No folder chosen; exiting.")
+            return
 
     outdir = args.outdir or args.folder / OUT_NAME
     folders = sorted(

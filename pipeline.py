@@ -12,7 +12,8 @@ Steps
 
 Usage
 -----
-    uv run python pipeline.py "105-cad-1.nd2 - 105-cad-1.nd2 (series 1).ome.tif"
+    uv run python pipeline.py              # opens a file picker to choose the image
+    uv run python pipeline.py path/to/image.ome.tif
 
 Options: see `uv run python pipeline.py --help`.
 
@@ -331,12 +332,26 @@ def open_file(path: Path) -> None:
         subprocess.run(["xdg-open", str(path)], check=False)
 
 
+def choose_image() -> Path | None:
+    """Open a file dialog to pick the timelapse. Returns None if cancelled."""
+    from napari.qt import get_qapp
+    from qtpy.QtWidgets import QFileDialog
+
+    get_qapp()
+    path, _ = QFileDialog.getOpenFileName(
+        None, "Choose a timelapse image", str(Path.home()),
+        "Images (*.tif *.tiff *.nd2);;All files (*)",
+    )
+    return Path(path) if path else None
+
+
 # --------------------------------------------------------------------------- #
 # Main
 # --------------------------------------------------------------------------- #
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("image", type=Path, help="timelapse .tif / .ome.tif / .nd2")
+    p.add_argument("image", type=Path, nargs="?", default=None,
+                   help="timelapse .tif / .ome.tif / .nd2 (omit to choose it in a file dialog)")
     p.add_argument("--radius", type=float, default=50, help="rolling ball radius in pixels (default 50)")
     p.add_argument("--reg-mode", default="rigid", choices=["translation", "rigid", "scaled", "affine"])
     p.add_argument("--no-registration", action="store_true", help="skip StackReg step")
@@ -349,6 +364,11 @@ def main():
     p.add_argument("--no-open", action="store_true", help="don't open the plot PDF when done")
     p.add_argument("--reprocess", action="store_true", help="ignore cached processed.tif and redo steps 1-2")
     args = p.parse_args()
+    if args.image is None:
+        args.image = choose_image()
+        if args.image is None:
+            print("No file chosen; exiting.")
+            return
 
     outdir = args.outdir or args.image.with_name(f"{args.image.name.removesuffix('.ome.tif').removesuffix('.tif')}_analysis")
     outdir.mkdir(parents=True, exist_ok=True)
